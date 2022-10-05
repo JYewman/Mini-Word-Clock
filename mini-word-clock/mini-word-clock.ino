@@ -137,7 +137,7 @@ void handleRoot()
 					</p>\
 					<select name=\"timezone\">\
 						<option value=\"0\">Europe/London</option>\
-						<option value=\"1\">L'Europe/London</option>\
+						<option value=\"1\">Europe/Central</option>\
 					</select>\
 					<div class=\"submit\">\
 						<button type=\"submit\">Save Time and Date options</button>\
