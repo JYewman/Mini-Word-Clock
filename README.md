@@ -1,4 +1,4 @@
-# Mini-Word-Clock
+# Mini Word Clock
 
 ## About The Project
 
