@@ -9,7 +9,6 @@ All that is needed is an ESP8266 and a MAX7219 for this to work.
 This code uses the Arduino Compiler to build.
 */
 
-
 /*-------- Libraries ----------*/
 #include <LedControl.h>
 #include <ESP8266WebServer.h>
@@ -18,43 +17,52 @@ This code uses the Arduino Compiler to build.
 #include <ArduinoJson.h>
 #include <WiFiManager.h>
 #include <DNSServer.h>
-#include <TimeLib.h> 
+#include <TimeLib.h>
 #include <WiFiUdp.h>
 #include <FS.h>
 #include <EEPROM.h>
 
-const char* project = "Mini_WordClock";
+const char *project = "Mini_WordClock";
 
-//Define MAX7219 Pins
+// Define MAX7219 Pins
 #define DIN 2
 #define CLK 4
 #define CS 0
-
 
 /*-------- Timezone definitions ----------*/
 // Each timezone value increments GMT for example 0 is GMT+0, 1 is GMT+1
 #define EUROPE_LONDON 0
 #define EUROPE_CENTRAL 1
 
-int currentBrightness = 15;
+/*-------- Misc definitions ----------*/
+int currentBrightness = 0;
+uint addr = 0;
+
+struct
+{
+	int firstRun = -1;
+	int brightness = -1;
+	int timezone = -1;
+} eeprom_data;
 
 LedControl matrix = LedControl(DIN, CLK, CS, 1);
 
 /*-------- NTP Server Details ----------*/
 const unsigned int localPort = 2390;
 IPAddress timeServerIP;
-const char* ntpServerName = "uk.pool.ntp.org";
+const char *ntpServerName = "uk.pool.ntp.org";
 WiFiUDP udp;
 WiFiManager wifiManager;
-char timeZone[2] = "0"; //GMT+Val
+char timeZone[2] = "0"; // GMT+Val
 time_t prevDisplay = 0;
 
 /*-------- Web Server Code ----------*/
-//Web Server Port
+// Web Server Port
 ESP8266WebServer server(80);
 
-//Root Web Interface
-void handleRoot() {
+// Root Web Interface
+void handleRoot()
+{
 	char temp[50000];
 
 	snprintf(temp, 50000, "\
@@ -188,114 +196,44 @@ void handleRoot() {
 		</main>\
 	</body>\
 </html>\
-", currentBrightness);
+",
+			 currentBrightness);
 	server.send(200, "text/html", temp);
-}
-
-void handleTimezone() {
-	//TODO Add current timezone to WebUI
-	String timezone = server.arg("timezone");
-	int timezone_num = timezone.toInt();
-	if (timezone_num == EUROPE_LONDON) {
-		timeZone[2] = '0';
-		Serial.println("EUROPE/LONDON TIMEZONE SET");
-		Serial.println(timeZone[2]);
-	} else if (timezone_num == EUROPE_CENTRAL) {
-		timeZone[2] = '1';
-		Serial.println("EUROPE/CENTRAL TIMEZONE SET");
-		Serial.println(timeZone[2]);
-	}
-	server.sendHeader("Location", String("/"), true);
-	server.send(302, "text/plain", "");
-}
-
-void handleSystem() {
-	String brightness = server.arg("brightness");
-	int brightness_num = brightness.toInt();
-
-	if (brightness_num >= 0 && brightness_num <= 15) {
-		currentBrightness = brightness_num;
-		matrix.setIntensity(0, currentBrightness);
-	}
-	
-	server.sendHeader("Location", String("/"), true);
-	server.send(302, "text/plain", "");
-}
-
-void handleReboot() {
-	server.send(200, "text/html", "\
-	<html>\
-		<body>\
-			<h1>Reload in progress...</h1>\
-			<script>\
-				const tryReboot = () => {\
-					fetch(window.location.origin)\
-						.then(res => {\
-							if (res.ok) {\
-								window.location.href = \"/\"\
-							} else {\
-								setTimeout(() => {\
-									tryReboot()\
-								}, 1000)\
-							}\
-						})\
-				};\
-				tryReboot();\
-			</script>\
-		</body>\
-	</html>\
-	");
-  delay(500);
-	ESP.reset();
-}
-
-void handleReset() {
-	server.send(200, "text/plain", "Resetting system. Reconnect to the Mini Word Clock Wifi Hotspot to continue.");
-	wifiManager.resetSettings();
-}
-
-
-//404 Handle
-void handleNotFound() {
-	String message = "404 Not Found\n\n";
-	message += "URI: ";
-	message += server.uri();
-	message += "\nMethod: ";
-	message += (server.method() == HTTP_GET) ? "GET" : "POST";
-	message += "\nArguments: ";
-	message += server.args();
-	message += "\n";
-
-	for (uint8_t i = 0; i < server.args(); i++) { message += " " + server.argName(i) + ": " + server.arg(i) + "\n"; }
-
-	server.send(404, "text/plain", message);
 }
 
 /*-------- General Setup ----------*/
 void setup()
+{
+	Serial.begin(115200);
+	delay(500);
+	Serial.println();
+	Serial.println();
+	Serial.println("Bootloader Handover Complete");
+	Serial.println("Booting...");
+
+	// EEPROM Setup
+	Serial.println("Fetching Configuration...");
+	EEPROM.begin(512);
+
+	// Get current EEPROM values and set enviroment variables from EEPROM
+	EEPROM.get(addr, eeprom_data);
+	Serial.println("Current brightness value is: " + String(eeprom_data.brightness) + " Current Timezone is: " + String(eeprom_data.timezone));
+	if (isFirstRun() == true)
+	{
+		Serial.println("First run detected!");
+		Serial.println("Initial settings have been set");
+		Serial.println("You can change the current settings using the Web Interface");
+	}
+	else
+	{
+		currentBrightness = eeprom_data.brightness;
+		timeZone[2] = char(eeprom_data.timezone);
+	}
+
 	matrix.shutdown(0, false);
 	matrix.setIntensity(0, currentBrightness);
 	matrix.clearDisplay(0);
 	SetWords("Boot");
-
-	Serial.begin(115200);
-	Serial.println();
-	Serial.println();
-
-	//EEPROM Setup
-	Serial.println("Fetching Configuration...");
-	uint addr = 0;
-	EEPROM.begin(512);
-
-	//EEPROM data
-	struct { 
-    	int birghtness = 0;
-    	int timezone = 0;
-  	} data;
-
-	EEPROM.get(addr,data);
-	Serial.println("Current brightness value is: "+String(data.brightness)+" Current Timezone is: "+String(data.timezone));
-	if (data.brightness == )
 
 	wifiManager.setMinimumSignalQuality(1);
 
@@ -332,10 +270,143 @@ void setup()
 	Serial.println("");
 }
 
+bool isFirstRun()
+{
+	EEPROM.get(addr, eeprom_data);
+	if (eeprom_data.firstRun == -1)
+	{
+		eeprom_data.brightness = currentBrightness;
+		Serial.print("Default EEPROM Brightness Set: ");
+		Serial.println(currentBrightness);
+		
+		int tempA;
+		tempA = timeZone[2];
+		eeprom_data.timezone = tempA;
+		Serial.print("Default EEPROM TimeZone Set: ");
+		Serial.println(tempA);
+
+		eeprom_data.firstRun = 1;
+		EEPROM.put(addr, eeprom_data);
+		EEPROM.commit();
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+/*-------- WebUI Handles ----------*/
+void handleTimezone()
+{
+	// TODO Add current timezone to WebUI
+	String timezone = server.arg("timezone");
+	int timezone_num = timezone.toInt();
+	if (timezone_num == EUROPE_LONDON)
+	{
+		timeZone[2] = '0';
+		Serial.println("EUROPE/LONDON TIMEZONE SET");
+		handleEEPROMTimeZone();
+	}
+	else if (timezone_num == EUROPE_CENTRAL)
+	{
+		timeZone[2] = '1';
+		Serial.println("EUROPE/CENTRAL TIMEZONE SET");
+		handleEEPROMTimeZone();
+	}
+	server.sendHeader("Location", String("/"), true);
+	server.send(302, "text/plain", "");
+}
+
+void handleEEPROMTimeZone(){
+	int tempA;
+	tempA = timeZone[2];
+	eeprom_data.timezone = tempA;
+	EEPROM.put(addr, eeprom_data);
+	EEPROM.commit();
+}
+
+void handleSystem()
+{
+	String brightness = server.arg("brightness");
+	int brightness_num = brightness.toInt();
+
+	if (brightness_num >= 0 && brightness_num <= 15)
+	{
+		currentBrightness = brightness_num;
+		eeprom_data.brightness = brightness_num;
+		EEPROM.put(addr, eeprom_data);
+		EEPROM.commit();
+		matrix.setIntensity(0, currentBrightness);
+	}
+
+	server.sendHeader("Location", String("/"), true);
+	server.send(302, "text/plain", "");
+}
+
+void handleReboot()
+{
+	server.send(200, "text/html", "\
+	<html>\
+		<body>\
+			<h1>Reload in progress...</h1>\
+			<script>\
+				const tryReboot = () => {\
+					fetch(window.location.origin)\
+						.then(res => {\
+							if (res.ok) {\
+								window.location.href = \"/\"\
+							} else {\
+								setTimeout(() => {\
+									tryReboot()\
+								}, 1000)\
+							}\
+						})\
+				};\
+				tryReboot();\
+			</script>\
+		</body>\
+	</html>\
+	");
+	delay(500);
+	ESP.reset();
+}
+
+void handleReset()
+{
+	server.send(200, "text/plain", "Resetting system. Reconnect to the Mini Word Clock Wifi Hotspot to continue.");
+	eeprom_data.firstRun = -1;
+	EEPROM.put(addr, eeprom_data);
+	EEPROM.commit();
+	wifiManager.resetSettings();
+	ESP.reset();
+}
+
+// 404 Handle
+void handleNotFound()
+{
+	String message = "404 Not Found\n\n";
+	message += "URI: ";
+	message += server.uri();
+	message += "\nMethod: ";
+	message += (server.method() == HTTP_GET) ? "GET" : "POST";
+	message += "\nArguments: ";
+	message += server.args();
+	message += "\n";
+
+	for (uint8_t i = 0; i < server.args(); i++)
+	{
+		message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+	}
+
+	server.send(404, "text/plain", message);
+}
+
 /*-------- Main Loop ----------*/
 void loop()
 {
-	//Checks for NTP sync and updates clock
+	// Checks for NTP sync and updates clock
 	server.handleClient();
 	if (timeStatus() != timeNotSet)
 	{
@@ -344,15 +415,14 @@ void loop()
 			prevDisplay = now();
 
 			SetDisplayTime();
-
 		}
 	}
-	//Get NTP sync
+	// Get NTP sync
 	else
 	{
 		WiFi.hostByName(ntpServerName, timeServerIP);
 		Serial.println("Waiting for NTP sync...");
-		setSyncProvider(getNtpTime);	
+		setSyncProvider(getNtpTime);
 	}
 }
 
@@ -365,7 +435,8 @@ int GetSummOrWinterHour()
 	{
 		summerTime = false;
 	}
-	else if (month() > 3 && month() < 10) {
+	else if (month() > 3 && month() < 10)
+	{
 		summerTime = true;
 	}
 	else if (month() == 3 && (hour() + 24 * day()) >= (1 + String(timeZone).toInt() + 24 * (31 - (5 * year() / 4 + 4) % 7)) || month() == 10 && (hour() + 24 * day()) < (1 + String(timeZone).toInt() + 24 * (31 - (5 * year() / 4 + 1) % 7)))
@@ -564,10 +635,12 @@ void SetWords(String word)
 	{
 		matrix.setColumn(0, 7, B01011000);
 	}
-	else if (word == "20"){
+	else if (word == "20")
+	{
 		matrix.setColumn(0, 7, B01111110);
 	}
-	else if (word == "25"){
+	else if (word == "25")
+	{
 		matrix.setColumn(0, 7, B01111110);
 		matrix.setColumn(0, 5, B11110000);
 	}
@@ -588,7 +661,8 @@ byte packetBuffer[NTP_PACKET_SIZE];
 
 time_t getNtpTime()
 {
-	while (udp.parsePacket() > 0);
+	while (udp.parsePacket() > 0)
+		;
 	Serial.println("Sending NTP Request...");
 	sendNTPpacket(timeServerIP);
 	uint32_t beginWait = millis();
