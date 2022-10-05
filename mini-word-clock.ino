@@ -213,7 +213,6 @@ void handleSystem() {
 		matrix.setIntensity(0, currentBrightness);
 	}
 	
-	// Cum in me bum
 	server.sendHeader("Location", String("/"), true);
 	server.send(302, "text/plain", "");
 }
@@ -292,7 +291,6 @@ void setup()
 		delay(5000);
 	}
 
-	//if you get here you have connected to the WiFi
 	Serial.println("WiFi Connection Established");
 
 
