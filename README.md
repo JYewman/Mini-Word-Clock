@@ -2,7 +2,7 @@
 
 ## About The Project
 
-This software was made out of complete spite for the maker of https://www.etsy.com/uk/listing/853880992/miniature-word-clock-set-in-turned-irish and https://www.ebay.co.uk/itm/274580832614 who refused to give me the software for a corupt miniture word clock. So here is a complete and better firmware for a any mini word clock using the ESP8266 and MAX7219.
+This software was made out of complete spite for the maker of https://www.etsy.com/uk/listing/853880992/miniature-word-clock-set-in-turned-irish and https://www.ebay.co.uk/itm/274580832614 who refused to give me the software for a corupt miniture word clock. So here is a complete and better firmware for any mini word clock using the ESP8266 and MAX7219.
 
 This code includes a WiFi connection manager and Web Interface to change settings.
 
