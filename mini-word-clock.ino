@@ -9,6 +9,7 @@ All that is needed is an ESP8266 and a MAX7219 for this to work.
 This code uses the Arduino Compiler to build.
 */
 
+
 /*-------- Libraries ----------*/
 #include <LedControl.h>
 #include <ESP8266WebServer.h>
@@ -29,6 +30,9 @@ const char* project = "Mini_WordClock";
 #define CLK 4
 #define CS 0
 
+
+/*-------- Timezone definitions ----------*/
+// Each timezone value increments GMT for example 0 is GMT+0, 1 is GMT+1
 #define EUROPE_LONDON 0
 #define EUROPE_CENTRAL 1
 
@@ -189,6 +193,7 @@ void handleRoot() {
 }
 
 void handleTimezone() {
+	//TODO Add current timezone to WebUI
 	String timezone = server.arg("timezone");
 	int timezone_num = timezone.toInt();
 	if (timezone_num == EUROPE_LONDON) {
@@ -252,7 +257,7 @@ void handleReset() {
 
 //404 Handle
 void handleNotFound() {
-	String message = "You did fucky wucky\n\n";
+	String message = "404 Not Found\n\n";
 	message += "URI: ";
 	message += server.uri();
 	message += "\nMethod: ";
@@ -266,9 +271,8 @@ void handleNotFound() {
 	server.send(404, "text/plain", message);
 }
 
-/*-------- Clock Setup ----------*/
+/*-------- General Setup ----------*/
 void setup()
-{	
 	matrix.shutdown(0, false);
 	matrix.setIntensity(0, currentBrightness);
 	matrix.clearDisplay(0);
@@ -278,8 +282,20 @@ void setup()
 	Serial.println();
 	Serial.println();
 
-	//reset settings - for testing
-	//wifiManager.resetSettings();
+	//EEPROM Setup
+	Serial.println("Fetching Configuration...");
+	uint addr = 0;
+	EEPROM.begin(512);
+
+	//EEPROM data
+	struct { 
+    	int birghtness = 0;
+    	int timezone = 0;
+  	} data;
+
+	EEPROM.get(addr,data);
+	Serial.println("Current brightness value is: "+String(data.brightness)+" Current Timezone is: "+String(data.timezone));
+	if (data.brightness == )
 
 	wifiManager.setMinimumSignalQuality(1);
 
@@ -292,7 +308,6 @@ void setup()
 	}
 
 	Serial.println("WiFi Connection Established");
-
 
 	Serial.println("IP Details:");
 	Serial.println(WiFi.localIP());
