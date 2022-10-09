@@ -135,6 +135,9 @@ void handleRoot()
 					<p>\
 						Select the time zone that you want the clock to synchronise with.\
 					</p>\
+          <p>\
+            This will update at the next time change.\
+          </p>\
 					<select name=\"timezone\">\
 						<option value=\"0\">Europe/London</option>\
 						<option value=\"1\">Europe/Central</option>\
@@ -210,32 +213,7 @@ void setup()
 	Serial.println();
 	Serial.println("Bootloader Handover Complete");
 	Serial.println("Booting...");
-
-	// EEPROM Setup
-	Serial.println("Fetching Configuration...");
-	EEPROM.begin(512);
-
-	// Get current EEPROM values and set enviroment variables from EEPROM
-	EEPROM.get(addr, eeprom_data);
-	Serial.println("Current brightness value is: " + String(eeprom_data.brightness) + " Current Timezone is: " + String(eeprom_data.timezone));
-	if (isFirstRun() == true)
-	{
-		Serial.println("First run detected!");
-		Serial.println("Initial settings have been set");
-		Serial.println("You can change the current settings using the Web Interface");
-	}
-	else
-	{
-		currentBrightness = eeprom_data.brightness;
-		timeZone[2] = char(eeprom_data.timezone);
-	}
-
-	matrix.shutdown(0, false);
-	matrix.setIntensity(0, currentBrightness);
-	matrix.clearDisplay(0);
-	SetWords("Boot");
-
-	wifiManager.setMinimumSignalQuality(1);
+  wifiManager.setMinimumSignalQuality(1);
 
 	if (!wifiManager.autoConnect(project))
 	{
@@ -245,17 +223,47 @@ void setup()
 		delay(5000);
 	}
 
+  Serial.println("");
 	Serial.println("WiFi Connection Established");
 
-	Serial.println("IP Details:");
+	Serial.println("DHCP Details:");
+  Serial.print("Device IP: ");
 	Serial.println(WiFi.localIP());
+  Serial.print("Gateway IP: ");
 	Serial.println(WiFi.gatewayIP());
+  Serial.print("Subnet Mask: ");
 	Serial.println(WiFi.subnetMask());
-
-	Serial.println("Starting UDP");
+  
+  Serial.println("");
+	Serial.println("Starting UDP...");
 	udp.begin(localPort);
 	Serial.print("Local port: ");
 	Serial.println(udp.localPort());
+  Serial.println("");
+
+	// EEPROM Setup
+	Serial.println("Fetching Configuration...");
+	EEPROM.begin(512);
+
+	// Get current EEPROM values and set enviroment variables from EEPROM
+	EEPROM.get(addr, eeprom_data);
+	if (isFirstRun() == true)
+	{
+		Serial.println("First run detected!");
+		Serial.println("Initial settings have been set");
+		Serial.println("You can change the current settings using the Web Interface");
+	}
+	else
+	{
+    Serial.println("Current brightness value is: " + String(eeprom_data.brightness));
+    Serial.println("Current timezone is: " + String(eeprom_data.timezone));
+		currentBrightness = eeprom_data.brightness;
+		timeZone[2] = char(eeprom_data.timezone);
+	}
+
+	matrix.shutdown(0, false);
+	matrix.setIntensity(0, currentBrightness);
+	matrix.clearDisplay(0);
 
 	delay(100);
 	server.on("/", handleRoot);
